@@ -27,9 +27,4 @@ public class AuthController {
                 .build());
     }
 
-    @PostMapping("/registro")
-    public ResponseEntity<String> registro(@RequestBody @Valid LoginRequestDTO dto) {
-        authService.registrarAdmin(dto.getEmail(), dto.getPassword());
-        return ResponseEntity.status(HttpStatus.CREATED).body("Admin creado correctamente");
-    }
 }

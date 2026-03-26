@@ -29,15 +29,4 @@ public class AuthService {
         return jwtService.generateToken(usuario);
     }
 
-    public void registrarAdmin(String email, String password) {
-        if (usuarioRepository.findByEmail(email).isPresent()) {
-            throw new IllegalStateException("Ya existe un usuario con ese email");
-        }
-        Usuario usuario = Usuario.builder()
-                .email(email)
-                .password(passwordEncoder.encode(password))
-                .rol(Rol.ADMIN)
-                .build();
-        usuarioRepository.save(usuario);
-    }
 }
