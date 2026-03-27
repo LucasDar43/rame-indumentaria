@@ -1,9 +1,11 @@
 package com.tudominio.rame_indumentaria.dto.mapper;
 
+import com.tudominio.rame_indumentaria.dto.ImagenProductoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoRequestDTO;
 import com.tudominio.rame_indumentaria.model.Producto;
 import org.springframework.stereotype.Component;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,7 +22,16 @@ public class ProductoMapper {
                 .marca(producto.getMarca())
                 .categoria(producto.getCategoria())
                 .subcategoria(producto.getSubcategoria())
-                .imagenes(producto.getImagenes())
+                .imagenUrl(producto.getImagenUrl())
+                .imagenes(
+                        producto.getImagenes().stream()
+                                .map(img -> ImagenProductoDTO.builder()
+                                        .id(img.getId())
+                                        .url(img.getUrl())
+                                        .orden(img.getOrden())
+                                        .build())
+                                .collect(Collectors.toList())
+                )
                 .activo(producto.getActivo())
                 .fechaCreacion(producto.getFechaCreacion())
                 .build();
@@ -34,7 +45,7 @@ public class ProductoMapper {
                 .marca(dto.getMarca())
                 .categoria(dto.getCategoria())
                 .subcategoria(dto.getSubcategoria())
-                .imagenes(dto.getImagenes() != null ? dto.getImagenes() : new ArrayList<>())
+                .imagenes(new ArrayList<>())
                 .build();
     }
 
@@ -43,5 +54,4 @@ public class ProductoMapper {
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
-
 }

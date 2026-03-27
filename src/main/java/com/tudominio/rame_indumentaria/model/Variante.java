@@ -32,6 +32,8 @@ public class Variante {
 
     private String sku;
 
+    @Builder.Default
     private Boolean activo = true;
+
     private String color;
 }
