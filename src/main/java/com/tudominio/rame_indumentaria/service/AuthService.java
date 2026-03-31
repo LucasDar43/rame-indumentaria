@@ -1,6 +1,6 @@
 package com.tudominio.rame_indumentaria.service;
 
-import com.tudominio.rame_indumentaria.model.Rol;
+import com.tudominio.rame_indumentaria.dto.LoginResponseDTO;
 import com.tudominio.rame_indumentaria.model.Usuario;
 import com.tudominio.rame_indumentaria.repository.UsuarioRepository;
 import com.tudominio.rame_indumentaria.security.JwtService;
@@ -18,7 +18,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public String login(String email, String password) {
+    public LoginResponseDTO login(String email, String password) {
         Usuario usuario = usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Credenciales incorrectas"));
 
@@ -26,7 +26,12 @@ public class AuthService {
             throw new BadCredentialsException("Credenciales incorrectas");
         }
 
-        return jwtService.generateToken(usuario);
-    }
+        String token = jwtService.generateToken(usuario);
 
+        return LoginResponseDTO.builder()
+                .token(token)
+                .email(usuario.getEmail())
+                .rol(usuario.getRol().name())
+                .build();
+    }
 }
