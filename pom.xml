@@ -96,6 +96,13 @@
 			<version>5.2.5</version>
 		</dependency>
 
+		<!-- MercadoPago -->
+		<dependency>
+			<groupId>com.mercadopago</groupId>
+			<artifactId>sdk-java</artifactId>
+			<version>2.1.24</version>
+		</dependency>
+
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

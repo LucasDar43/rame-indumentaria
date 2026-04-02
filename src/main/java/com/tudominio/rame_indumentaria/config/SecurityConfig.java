@@ -37,6 +37,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/productos/*/variantes").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/ordenes").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/ordenes/**").permitAll()
+                        .requestMatchers("/api/webhook/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
