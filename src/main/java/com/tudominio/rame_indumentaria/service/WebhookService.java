@@ -23,26 +23,38 @@ public class WebhookService {
     @Transactional
     public void procesarWebhook(Map<String, Object> payload) {
         String type = (String) payload.get("type");
+        log.info("Webhook recibido - tipo: {}", type);
 
         // Solo nos interesan los eventos de pago
         if (!"payment".equals(type)) {
-            log.info("Webhook ignorado, tipo: {}", type);
+            log.info("Webhook ignorado, tipo no es 'payment': {}", type);
             return;
         }
 
         try {
             Map<?, ?> data = (Map<?, ?>) payload.get("data");
+            if (data == null || data.get("id") == null) {
+                log.error("Webhook payment sin data o id");
+                return;
+            }
             String paymentIdStr = String.valueOf(data.get("id"));
             Long paymentId = Long.parseLong(paymentIdStr);
 
-            // Consultar el pago a MP para obtener el estado real
+            log.info("Consultando pago {} a MercadoPago...", paymentId);
             PaymentClient paymentClient = new PaymentClient();
             Payment payment = paymentClient.get(paymentId);
 
-            String externalReference = payment.getExternalReference(); // es el id de nuestra orden
+            String externalReference = payment.getExternalReference();
             String mpStatus = payment.getStatus();
+            String mpStatusDetail = payment.getStatusDetail();
 
-            log.info("Webhook payment {} - estado: {} - orden: {}", paymentId, mpStatus, externalReference);
+            log.info("Payment MP {} - status: {} ({}) - externalReference: {}",
+                    paymentId, mpStatus, mpStatusDetail, externalReference);
+
+            if (externalReference == null || externalReference.isBlank()) {
+                log.error("Payment {} no tiene externalReference. No se puede vincular a orden.", paymentId);
+                return;
+            }
 
             Orden orden = ordenRepository.findById(Long.parseLong(externalReference))
                     .orElseThrow(() -> new RuntimeException("Orden no encontrada: " + externalReference));
@@ -50,13 +62,21 @@ public class WebhookService {
             orden.setMpPaymentId(paymentIdStr);
             orden.setEstado(mapearEstado(mpStatus));
             ordenRepository.save(orden);
+            log.info("Orden {} actualizada a estado {}", orden.getId(), orden.getEstado());
 
-        } catch (MPException | MPApiException e) {
-            log.error("Error al consultar pago a MercadoPago: {}", e.getMessage());
+        } catch (MPApiException e) {
+            log.error("MP Status Code: {}", e.getStatusCode());
+            log.error("MP Response: {}", e.getApiResponse().getContent());
+        } catch (MPException e) {
+            log.error("MP Exception: {}", e.getMessage());
+        } catch (NumberFormatException e) {
+            log.error("Error de formato numérico en externalReference: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("Error inesperado en webhook: {}", e.getMessage());
+            log.error("Error inesperado en webhook: {}", e.getMessage(), e);
         }
     }
+
+
 
     private EstadoOrden mapearEstado(String mpStatus) {
         return switch (mpStatus) {

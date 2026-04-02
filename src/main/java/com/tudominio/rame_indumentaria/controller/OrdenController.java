@@ -29,4 +29,5 @@ public class OrdenController {
     public ResponseEntity<OrdenResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(ordenService.buscarPorId(id));
     }
+
 }
