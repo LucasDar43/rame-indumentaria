@@ -5,6 +5,7 @@ import com.tudominio.rame_indumentaria.dto.ProductoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoRequestDTO;
 import com.tudominio.rame_indumentaria.service.CloudinaryService;
 import com.tudominio.rame_indumentaria.service.ImportacionService;
+import com.tudominio.rame_indumentaria.service.ImportacionSimpleService;
 import com.tudominio.rame_indumentaria.service.ProductoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -26,11 +27,19 @@ public class ProductoController {
     private final ProductoService productoService;
     private final CloudinaryService cloudinaryService;
     private final ImportacionService importacionService;
+    private final ImportacionSimpleService importacionSimpleService;
 
     // GET paginado
     @GetMapping
     public ResponseEntity<Page<ProductoDTO>> listar(Pageable pageable) {
         return ResponseEntity.ok(productoService.listarPaginado(pageable));
+    }
+
+    @PostMapping(value = "/importar-simple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ImportacionResultadoDTO> importarSimple(
+            @RequestPart("archivo") MultipartFile archivo
+    ) throws IOException {
+        return ResponseEntity.ok(importacionSimpleService.importarSimple(archivo));
     }
 
     // GET por ID
@@ -86,4 +95,6 @@ public class ProductoController {
     ) throws IOException {
         return ResponseEntity.ok(importacionService.importarProductos(archivo));
     }
+
+
 }

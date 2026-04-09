@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 public class ImportacionResultadoDTO {
-    private int importados;
+    private int productosCreados;
+    private int variantesCreadas;
     private List<FilaErrorDTO> errores;
 }
