@@ -1,11 +1,19 @@
 package com.tudominio.rame_indumentaria.service;
 
-import com.mercadopago.client.preference.*;
+import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
+import com.mercadopago.client.preference.PreferenceClient;
+import com.mercadopago.client.preference.PreferenceItemRequest;
+import com.mercadopago.client.preference.PreferenceRequest;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.preference.Preference;
-import com.tudominio.rame_indumentaria.dto.*;
-import com.tudominio.rame_indumentaria.model.*;
+import com.tudominio.rame_indumentaria.dto.OrdenItemDTO;
+import com.tudominio.rame_indumentaria.dto.OrdenItemRequestDTO;
+import com.tudominio.rame_indumentaria.dto.OrdenRequestDTO;
+import com.tudominio.rame_indumentaria.dto.OrdenResponseDTO;
+import com.tudominio.rame_indumentaria.model.Orden;
+import com.tudominio.rame_indumentaria.model.OrdenItem;
+import com.tudominio.rame_indumentaria.model.Producto;
 import com.tudominio.rame_indumentaria.repository.OrdenRepository;
 import com.tudominio.rame_indumentaria.repository.ProductoRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +31,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrdenService {
 
+    private static final BigDecimal UMBRAL_ENVIO_GRATIS = BigDecimal.valueOf(50000);
+    private static final BigDecimal COSTO_ENVIO_FIJO = BigDecimal.valueOf(3000);
+
     private final OrdenRepository ordenRepository;
     private final ProductoRepository productoRepository;
 
@@ -31,29 +42,38 @@ public class OrdenService {
 
     @Transactional
     public OrdenResponseDTO crearOrden(OrdenRequestDTO dto) throws MPException, MPApiException {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new IllegalArgumentException("La orden debe tener al menos un item");
+        }
 
-        // 1. Construir items y calcular total
         List<OrdenItem> items = new ArrayList<>();
-        double total = 0;
+        BigDecimal subtotal = BigDecimal.ZERO;
 
         for (OrdenItemRequestDTO itemDto : dto.getItems()) {
             Producto producto = productoRepository.findById(itemDto.getProductoId())
                     .orElseThrow(() -> new EntityNotFoundException(
                             "Producto no encontrado: " + itemDto.getProductoId()));
 
+            BigDecimal precioUnitario = BigDecimal.valueOf(producto.getPrecio());
+            BigDecimal subtotalItem = precioUnitario.multiply(BigDecimal.valueOf(itemDto.getCantidad()));
+
             OrdenItem item = OrdenItem.builder()
                     .productoId(producto.getId())
                     .nombreProducto(producto.getNombre())
                     .imagenUrl(producto.getImagenUrl())
                     .cantidad(itemDto.getCantidad())
-                    .precioUnitario(producto.getPrecio())
+                    .precioUnitario(precioUnitario.doubleValue())
                     .build();
 
             items.add(item);
-            total += producto.getPrecio() * itemDto.getCantidad();
+            subtotal = subtotal.add(subtotalItem);
         }
 
-        // 2. Guardar la orden con estado PENDIENTE (sin preferenceId aún)
+        BigDecimal envio = subtotal.compareTo(UMBRAL_ENVIO_GRATIS) < 0
+                ? COSTO_ENVIO_FIJO
+                : BigDecimal.ZERO;
+        BigDecimal total = subtotal.add(envio);
+
         Orden orden = Orden.builder()
                 .nombreComprador(dto.getNombreComprador())
                 .emailComprador(dto.getEmailComprador())
@@ -61,16 +81,15 @@ public class OrdenService {
                 .direccionEnvio(dto.getDireccionEnvio())
                 .ciudadEnvio(dto.getCiudadEnvio())
                 .provinciaEnvio(dto.getProvinciaEnvio())
+                .costoEnvio(envio)
                 .total(total)
                 .items(items)
                 .build();
 
-        // Asociar items a la orden
         items.forEach(item -> item.setOrden(orden));
 
         Orden ordenGuardada = ordenRepository.save(orden);
 
-        // 3. Crear preferencia en MercadoPago
         List<PreferenceItemRequest> mpItems = items.stream().map(item ->
                 PreferenceItemRequest.builder()
                         .id(String.valueOf(item.getProductoId()))
@@ -80,7 +99,19 @@ public class OrdenService {
                         .unitPrice(BigDecimal.valueOf(item.getPrecioUnitario()))
                         .currencyId("ARS")
                         .build()
-        ).collect(Collectors.toList());
+        ).collect(Collectors.toCollection(ArrayList::new));
+
+        if (envio.compareTo(BigDecimal.ZERO) > 0) {
+            mpItems.add(
+                    PreferenceItemRequest.builder()
+                            .id("envio")
+                            .title("Costo de envio")
+                            .quantity(1)
+                            .unitPrice(envio)
+                            .currencyId("ARS")
+                            .build()
+            );
+        }
 
         PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
                 .success(frontendUrl + "/checkout/exitoso")
@@ -91,18 +122,15 @@ public class OrdenService {
         PreferenceRequest preferenceRequest = PreferenceRequest.builder()
                 .items(mpItems)
                 .backUrls(backUrls)
-                //.autoReturn("approved")
                 .externalReference(String.valueOf(ordenGuardada.getId()))
                 .build();
 
         PreferenceClient client = new PreferenceClient();
         Preference preference = client.create(preferenceRequest);
 
-        // 4. Actualizar la orden con el preferenceId
         ordenGuardada.setMpPreferenceId(preference.getId());
         ordenRepository.save(ordenGuardada);
 
-        // 5. Responder con init_point para redirigir al cliente
         return toResponseDTO(ordenGuardada, preference.getSandboxInitPoint());
     }
 
@@ -128,7 +156,7 @@ public class OrdenService {
                 .id(orden.getId())
                 .nombreComprador(orden.getNombreComprador())
                 .emailComprador(orden.getEmailComprador())
-                .total(orden.getTotal())
+                .total(orden.getTotal() != null ? orden.getTotal().doubleValue() : null)
                 .estado(orden.getEstado())
                 .mpPreferenceId(orden.getMpPreferenceId())
                 .initPoint(initPoint)

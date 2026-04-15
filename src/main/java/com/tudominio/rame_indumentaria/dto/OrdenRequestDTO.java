@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.*;
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -23,6 +24,8 @@ public class OrdenRequestDTO {
     private String direccionEnvio;
     private String ciudadEnvio;
     private String provinciaEnvio;
+    private BigDecimal costoEnvio;
+    private BigDecimal totalFinal;
 
     @NotEmpty
     private List<OrdenItemRequestDTO> items;
