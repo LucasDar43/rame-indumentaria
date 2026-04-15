@@ -7,6 +7,10 @@ import com.tudominio.rame_indumentaria.dto.OrdenResponseDTO;
 import com.tudominio.rame_indumentaria.service.OrdenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +32,13 @@ public class OrdenController {
     @GetMapping("/{id}")
     public ResponseEntity<OrdenResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(ordenService.buscarPorId(id));
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<OrdenResponseDTO>> listar(
+            @PageableDefault(size = 10, sort = "fechaCreacion", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        return ResponseEntity.ok(ordenService.listarPaginado(pageable));
     }
 
 }

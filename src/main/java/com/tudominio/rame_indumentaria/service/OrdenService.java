@@ -19,6 +19,8 @@ import com.tudominio.rame_indumentaria.repository.ProductoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -138,6 +140,11 @@ public class OrdenService {
         Orden orden = ordenRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada: " + id));
         return toResponseDTO(orden, null);
+    }
+
+    public Page<OrdenResponseDTO> listarPaginado(Pageable pageable) {
+        return ordenRepository.findAllByOrderByFechaCreacionDesc(pageable)
+                .map(orden -> toResponseDTO(orden, null));
     }
 
     private OrdenResponseDTO toResponseDTO(Orden orden, String initPoint) {
