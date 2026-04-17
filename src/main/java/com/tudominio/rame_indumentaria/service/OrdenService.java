@@ -1,9 +1,6 @@
 package com.tudominio.rame_indumentaria.service;
 
-import com.mercadopago.client.preference.PreferenceBackUrlsRequest;
-import com.mercadopago.client.preference.PreferenceClient;
-import com.mercadopago.client.preference.PreferenceItemRequest;
-import com.mercadopago.client.preference.PreferenceRequest;
+import com.mercadopago.client.preference.*;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.preference.Preference;
@@ -18,6 +15,7 @@ import com.tudominio.rame_indumentaria.repository.OrdenRepository;
 import com.tudominio.rame_indumentaria.repository.ProductoRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,12 +27,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrdenService {
 
     private static final BigDecimal UMBRAL_ENVIO_GRATIS = BigDecimal.valueOf(50000);
     private static final BigDecimal COSTO_ENVIO_FIJO = BigDecimal.valueOf(3000);
+    private static final boolean MODO_TEST = true;
 
     private final OrdenRepository ordenRepository;
     private final ProductoRepository productoRepository;
@@ -44,6 +44,9 @@ public class OrdenService {
 
     @Transactional
     public OrdenResponseDTO crearOrden(OrdenRequestDTO dto) throws MPException, MPApiException {
+
+        log.info("🚀 INICIO crearOrden");
+
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
             throw new IllegalArgumentException("La orden debe tener al menos un item");
         }
@@ -51,13 +54,24 @@ public class OrdenService {
         List<OrdenItem> items = new ArrayList<>();
         BigDecimal subtotal = BigDecimal.ZERO;
 
+        // =========================
+        // ARMADO DE ITEMS
+        // =========================
         for (OrdenItemRequestDTO itemDto : dto.getItems()) {
+
             Producto producto = productoRepository.findById(itemDto.getProductoId())
                     .orElseThrow(() -> new EntityNotFoundException(
                             "Producto no encontrado: " + itemDto.getProductoId()));
 
             BigDecimal precioUnitario = BigDecimal.valueOf(producto.getPrecio());
             BigDecimal subtotalItem = precioUnitario.multiply(BigDecimal.valueOf(itemDto.getCantidad()));
+
+            log.info("🧾 Item DTO → id: {} nombre: {} precio: {} cantidad: {}",
+                    producto.getId(),
+                    producto.getNombre(),
+                    producto.getPrecio(),
+                    itemDto.getCantidad()
+            );
 
             OrdenItem item = OrdenItem.builder()
                     .productoId(producto.getId())
@@ -71,10 +85,17 @@ public class OrdenService {
             subtotal = subtotal.add(subtotalItem);
         }
 
-        BigDecimal envio = subtotal.compareTo(UMBRAL_ENVIO_GRATIS) < 0
+        BigDecimal envio = MODO_TEST
+                ? BigDecimal.ZERO
+                : (subtotal.compareTo(UMBRAL_ENVIO_GRATIS) < 0
                 ? COSTO_ENVIO_FIJO
-                : BigDecimal.ZERO;
+                : BigDecimal.ZERO);
+
         BigDecimal total = subtotal.add(envio);
+
+        log.info("💰 Subtotal: {}", subtotal);
+        log.info("🚚 Envío: {}", envio);
+        log.info("💳 Total: {}", total);
 
         Orden orden = Orden.builder()
                 .nombreComprador(dto.getNombreComprador())
@@ -92,16 +113,29 @@ public class OrdenService {
 
         Orden ordenGuardada = ordenRepository.save(orden);
 
-        List<PreferenceItemRequest> mpItems = items.stream().map(item ->
-                PreferenceItemRequest.builder()
-                        .id(String.valueOf(item.getProductoId()))
-                        .title(item.getNombreProducto())
-                        .pictureUrl(item.getImagenUrl())
-                        .quantity(item.getCantidad())
-                        .unitPrice(BigDecimal.valueOf(item.getPrecioUnitario()))
-                        .currencyId("ARS")
-                        .build()
-        ).collect(Collectors.toCollection(ArrayList::new));
+        log.info("🧾 Orden guardada ID: {}", ordenGuardada.getId());
+
+        // =========================
+        // ITEMS MP
+        // =========================
+        List<PreferenceItemRequest> mpItems = items.stream().map(item -> {
+
+            log.info("🧾 Item MP → nombre: {} precio: {} cantidad: {}",
+                    item.getNombreProducto(),
+                    item.getPrecioUnitario(),
+                    item.getCantidad()
+            );
+
+            return PreferenceItemRequest.builder()
+                    .id(String.valueOf(item.getProductoId()))
+                    .title(item.getNombreProducto() != null ? item.getNombreProducto() : "Producto")
+                    .pictureUrl("https://via.placeholder.com/150")
+                    .quantity(item.getCantidad())
+                    .unitPrice(BigDecimal.valueOf(item.getPrecioUnitario()))
+                    .currencyId("ARS")
+                    .build();
+
+        }).collect(Collectors.toCollection(ArrayList::new));
 
         if (envio.compareTo(BigDecimal.ZERO) > 0) {
             mpItems.add(
@@ -115,25 +149,77 @@ public class OrdenService {
             );
         }
 
+        log.info("🛒 Total items enviados a MP: {}", mpItems.size());
+
+        // =========================
+        // BACK URLS
+        // =========================
         PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                .success(frontendUrl + "/checkout/exitoso")
-                .failure(frontendUrl + "/checkout/fallido")
-                .pending(frontendUrl + "/checkout/pendiente")
+                .success("https://paxton-successful-enlighteningly.ngrok-free.dev/success")
+                .failure("https://paxton-successful-enlighteningly.ngrok-free.dev/failure")
+                .pending("https://paxton-successful-enlighteningly.ngrok-free.dev/pending")
                 .build();
 
+        log.info("🌐 Back URLs: {}", backUrls);
+
+        // =========================
+        // PREFERENCE
+        // =========================
         PreferenceRequest preferenceRequest = PreferenceRequest.builder()
                 .items(mpItems)
                 .backUrls(backUrls)
+                .notificationUrl("https://paxton-successful-enlighteningly.ngrok-free.dev/api/webhook/mercadopago")
                 .externalReference(String.valueOf(ordenGuardada.getId()))
+                .paymentMethods(
+                        PreferencePaymentMethodsRequest.builder()
+                                .installments(1)
+                                .defaultInstallments(1)
+                                .build()
+                )
+                .expires(false)
                 .build();
 
+        // =========================
+        // CREAR PREFERENCE (DEBUG FUERTE)
+        // =========================
         PreferenceClient client = new PreferenceClient();
-        Preference preference = client.create(preferenceRequest);
 
-        ordenGuardada.setMpPreferenceId(preference.getId());
-        ordenRepository.save(ordenGuardada);
+        try {
+            log.info("🚀 Enviando preference a MercadoPago...");
+            log.info("ExternalReference: {}", ordenGuardada.getId());
+            log.info("Frontend URL: {}", frontendUrl);
 
-        return toResponseDTO(ordenGuardada, preference.getSandboxInitPoint());
+            Preference preference = client.create(preferenceRequest);
+
+            log.info("✅ Preference creada correctamente: {}", preference.getId());
+
+            ordenGuardada.setMpPreferenceId(preference.getId());
+            ordenRepository.save(ordenGuardada);
+
+            return toResponseDTO(ordenGuardada, preference.getInitPoint());
+
+        } catch (MPApiException e) {
+
+            log.error("❌ ERROR MPApiException");
+            log.error("Status Code: {}", e.getStatusCode());
+
+            if (e.getApiResponse() != null) {
+                log.error("Response Content: {}", e.getApiResponse().getContent());
+            }
+
+            throw e;
+
+        } catch (MPException e) {
+
+            log.error("❌ ERROR MPException");
+            log.error("Message: {}", e.getMessage());
+            throw e;
+
+        } catch (Exception e) {
+
+            log.error("❌ ERROR GENERAL creando preference", e);
+            throw e;
+        }
     }
 
     public OrdenResponseDTO buscarPorId(Long id) {

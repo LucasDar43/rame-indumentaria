@@ -15,6 +15,11 @@ public class WebhookController {
 
     @PostMapping("/mercadopago")
     public ResponseEntity<Void> recibirWebhook(@RequestBody Map<String, Object> payload) {
+
+
+        System.out.println("🔥 WEBHOOK RECIBIDO:");
+        System.out.println(payload);
+
         webhookService.procesarWebhook(payload);
         return ResponseEntity.ok().build();
     }

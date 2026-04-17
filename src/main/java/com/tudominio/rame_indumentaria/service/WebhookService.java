@@ -1,8 +1,10 @@
 package com.tudominio.rame_indumentaria.service;
 
+import com.mercadopago.client.merchantorder.MerchantOrderClient;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import com.mercadopago.resources.merchantorder.MerchantOrder;
 import com.mercadopago.resources.payment.Payment;
 import com.tudominio.rame_indumentaria.model.EstadoOrden;
 import com.tudominio.rame_indumentaria.model.Orden;
@@ -11,6 +13,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.mercadopago.client.merchantorder.MerchantOrderClient;
+import com.mercadopago.resources.merchantorder.MerchantOrder;
+import com.mercadopago.resources.merchantorder.MerchantOrderPayment;
+
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -23,60 +30,195 @@ public class WebhookService {
     @Transactional
     public void procesarWebhook(Map<String, Object> payload) {
         String type = (String) payload.get("type");
-        log.info("Webhook recibido - tipo: {}", type);
+        String topic = (String) payload.get("topic");
 
-        // Solo nos interesan los eventos de pago
-        if (!"payment".equals(type)) {
-            log.info("Webhook ignorado, tipo no es 'payment': {}", type);
+        log.info("🔥 Webhook recibido - type: {} topic: {}", type, topic);
+
+        try {
+            // 🔹 Caso 1: payment
+            if ("payment".equals(type)) {
+                procesarPayment(payload);
+                return;
+            }
+
+            // 🔹 Caso 2: merchant_order
+            if ("merchant_order".equals(topic)) {
+                String resource = (String) payload.get("resource");
+
+                if (resource == null) {
+                    log.error("merchant_order sin resource");
+                    return;
+                }
+
+                procesarMerchantOrder(resource);
+                return;
+            }
+
+            log.info("Webhook ignorado");
+
+        } catch (Exception e) {
+            log.error("Error procesando webhook", e);
+        }
+    }
+
+    // =========================
+    // PAYMENT FLOW
+    // =========================
+
+    private void procesarPayment(Map<String, Object> payload) throws MPException, MPApiException {
+        Map<?, ?> data = (Map<?, ?>) payload.get("data");
+
+        if (data == null || data.get("id") == null) {
+            log.error("Webhook payment sin data o id");
             return;
         }
 
+        Long paymentId = Long.parseLong(String.valueOf(data.get("id")));
+
+        log.info("Consultando payment {}", paymentId);
+
+        PaymentClient paymentClient = new PaymentClient();
+        Payment payment = paymentClient.get(paymentId);
+
+        actualizarOrdenDesdePayment(payment);
+        log.info("Payment completo: {}", payment);
+    }
+
+    // =========================
+    // MERCHANT ORDER FLOW (CLAVE)
+    // =========================
+
+    private void procesarMerchantOrder(String resourceUrl) {
+
         try {
-            Map<?, ?> data = (Map<?, ?>) payload.get("data");
-            if (data == null || data.get("id") == null) {
-                log.error("Webhook payment sin data o id");
+            // =========================
+            // EXTRAER ID DE LA URL
+            // =========================
+            String[] parts = resourceUrl.split("/");
+            Long merchantOrderId = Long.parseLong(parts[parts.length - 1]);
+
+            log.info("Consultando merchant_order {}", merchantOrderId);
+
+            // =========================
+            // CONSULTAR A MP
+            // =========================
+            MerchantOrderClient client = new MerchantOrderClient();
+            MerchantOrder merchantOrder = client.get(merchantOrderId);
+
+            // =========================
+            // LOGS COMPLETOS
+            // =========================
+            log.info("===== MERCHANT ORDER RAW =====");
+            log.info("ID: {}", merchantOrder.getId());
+            log.info("Status: {}", merchantOrder.getOrderStatus());
+            log.info("Total amount: {}", merchantOrder.getTotalAmount());
+            log.info("Paid amount: {}", merchantOrder.getPaidAmount());
+            log.info("Payments: {}", merchantOrder.getPayments());
+            log.info("================================");
+
+            // =========================
+            // VALIDAR PAYMENTS
+            // =========================
+            var payments = merchantOrder.getPayments();
+
+            if (payments == null || payments.isEmpty()) {
+                log.warn("merchant_order sin payments asociados");
                 return;
             }
-            String paymentIdStr = String.valueOf(data.get("id"));
-            Long paymentId = Long.parseLong(paymentIdStr);
 
-            log.info("Consultando pago {} a MercadoPago...", paymentId);
-            PaymentClient paymentClient = new PaymentClient();
-            Payment payment = paymentClient.get(paymentId);
+            log.info("Cantidad de payments: {}", payments.size());
 
+            // =========================
+            // RECORRER PAYMENTS
+            // =========================
+            for (MerchantOrderPayment payment : payments) {
+
+                log.info("---- PAYMENT ----");
+                log.info("Payment ID: {}", payment.getId());
+                log.info("Status: {}", payment.getStatus());
+                log.info("Total Paid Amount: {}", payment.getTotalPaidAmount());
+                log.info("------------------");
+
+                // ⚠️ SOLO PROCESAR APROBADOS
+                if (!"approved".equals(payment.getStatus())) {
+                    continue;
+                }
+
+                // =========================
+                // CONSULTAR PAYMENT COMPLETO
+                // =========================
+                PaymentClient paymentClient = new PaymentClient();
+                Payment mpPayment = paymentClient.get(payment.getId());
+
+                String externalReference = mpPayment.getExternalReference();
+
+                if (externalReference == null || externalReference.isBlank()) {
+                    log.error("Payment {} sin externalReference", payment.getId());
+                    continue;
+                }
+
+                // =========================
+                // ACTUALIZAR ORDEN
+                // =========================
+                Orden orden = ordenRepository.findById(Long.parseLong(externalReference))
+                        .orElseThrow(() -> new RuntimeException("Orden no encontrada: " + externalReference));
+
+                orden.setMpPaymentId(String.valueOf(payment.getId()));
+                orden.setEstado(EstadoOrden.APROBADO);
+
+                ordenRepository.save(orden);
+
+                log.info("Orden {} actualizada a APROBADO desde merchant_order", orden.getId());
+            }
+
+        } catch (Exception e) {
+            log.error("Error procesando merchant_order", e);
+        }
+    }
+
+    // =========================
+    // CORE UPDATE
+    // =========================
+
+    private void actualizarOrdenDesdePayment(Payment payment) {
+        try {
             String externalReference = payment.getExternalReference();
             String mpStatus = payment.getStatus();
-            String mpStatusDetail = payment.getStatusDetail();
+            String paymentId = String.valueOf(payment.getId());
 
-            log.info("Payment MP {} - status: {} ({}) - externalReference: {}",
-                    paymentId, mpStatus, mpStatusDetail, externalReference);
+            log.info("Payment {} - status: {} - externalReference: {}", paymentId, mpStatus, externalReference);
 
             if (externalReference == null || externalReference.isBlank()) {
-                log.error("Payment {} no tiene externalReference. No se puede vincular a orden.", paymentId);
+                log.error("Payment sin externalReference");
                 return;
             }
 
             Orden orden = ordenRepository.findById(Long.parseLong(externalReference))
                     .orElseThrow(() -> new RuntimeException("Orden no encontrada: " + externalReference));
 
-            orden.setMpPaymentId(paymentIdStr);
+            // 🧠 Idempotencia básica
+            if (paymentId.equals(orden.getMpPaymentId()) &&
+                    orden.getEstado() == mapearEstado(mpStatus)) {
+
+                log.info("Orden {} ya estaba actualizada, se ignora", orden.getId());
+                return;
+            }
+
+            orden.setMpPaymentId(paymentId);
             orden.setEstado(mapearEstado(mpStatus));
+
             ordenRepository.save(orden);
+
             log.info("Orden {} actualizada a estado {}", orden.getId(), orden.getEstado());
 
-        } catch (MPApiException e) {
-            log.error("MP Status Code: {}", e.getStatusCode());
-            log.error("MP Response: {}", e.getApiResponse().getContent());
-        } catch (MPException e) {
-            log.error("MP Exception: {}", e.getMessage());
-        } catch (NumberFormatException e) {
-            log.error("Error de formato numérico en externalReference: {}", e.getMessage());
         } catch (Exception e) {
-            log.error("Error inesperado en webhook: {}", e.getMessage(), e);
+            log.error("Error actualizando orden desde payment", e);
         }
     }
 
-
+    // =========================
+    // STATUS MAP
+    // =========================
 
     private EstadoOrden mapearEstado(String mpStatus) {
         return switch (mpStatus) {
