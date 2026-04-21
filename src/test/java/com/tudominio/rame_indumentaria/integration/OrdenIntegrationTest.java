@@ -20,6 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +68,7 @@ class OrdenIntegrationTest {
 
         Preference preference = mock(Preference.class);
         when(preference.getId()).thenReturn("pref-integration");
-        when(preference.getSandboxInitPoint()).thenReturn("https://sandbox.mercadopago.com/test-checkout");
+        when(preference.getInitPoint()).thenReturn("https://sandbox.mercadopago.com/test-checkout");
 
         Map<String, Object> payload = Map.of(
                 "nombreComprador", "Lucia Test",
@@ -110,6 +111,6 @@ class OrdenIntegrationTest {
         assertThat(orden.getItems()).hasSize(1);
         assertThat(orden.getItems().get(0).getProductoId()).isEqualTo(producto.getId());
         assertThat(orden.getItems().get(0).getCantidad()).isEqualTo(2);
-        assertThat(orden.getTotal()).isEqualTo(31998.0);
+        assertThat(orden.getTotal()).isEqualByComparingTo(BigDecimal.valueOf(31998.0));
     }
 }
