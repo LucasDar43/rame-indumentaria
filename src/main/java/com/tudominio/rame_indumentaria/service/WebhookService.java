@@ -5,19 +5,21 @@ import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.merchantorder.MerchantOrder;
+import com.mercadopago.resources.merchantorder.MerchantOrderPayment;
 import com.mercadopago.resources.payment.Payment;
 import com.tudominio.rame_indumentaria.model.EstadoOrden;
 import com.tudominio.rame_indumentaria.model.Orden;
 import com.tudominio.rame_indumentaria.repository.OrdenRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.mercadopago.client.merchantorder.MerchantOrderClient;
-import com.mercadopago.resources.merchantorder.MerchantOrder;
-import com.mercadopago.resources.merchantorder.MerchantOrderPayment;
 
-import java.util.List;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Map;
 
 @Slf4j
@@ -27,21 +29,24 @@ public class WebhookService {
 
     private final OrdenRepository ordenRepository;
 
+    @Value("${mercadopago.webhook-secret}")
+    private String webhookSecret;
+
     @Transactional
     public void procesarWebhook(Map<String, Object> payload) {
         String type = (String) payload.get("type");
         String topic = (String) payload.get("topic");
 
-        log.info("🔥 Webhook recibido - type: {} topic: {}", type, topic);
+        log.info("ðŸ”¥ Webhook recibido - type: {} topic: {}", type, topic);
 
         try {
-            // 🔹 Caso 1: payment
+            // ðŸ”¹ Caso 1: payment
             if ("payment".equals(type)) {
                 procesarPayment(payload);
                 return;
             }
 
-            // 🔹 Caso 2: merchant_order
+            // ðŸ”¹ Caso 2: merchant_order
             if ("merchant_order".equals(topic)) {
                 String resource = (String) payload.get("resource");
 
@@ -61,6 +66,60 @@ public class WebhookService {
         }
     }
 
+    public void validarFirma(String xSignature, String xRequestId, Map<String, Object> payload) {
+        if (xSignature == null || xSignature.isBlank()) {
+            throw new SecurityException("Header x-signature ausente");
+        }
+
+        String ts = null;
+        String v1 = null;
+
+        for (String part : xSignature.split(",")) {
+            String trimmedPart = part.trim();
+
+            if (trimmedPart.startsWith("ts=")) {
+                ts = trimmedPart.substring(3);
+            } else if (trimmedPart.startsWith("v1=")) {
+                v1 = trimmedPart.substring(3);
+            }
+        }
+
+        if (ts == null || v1 == null) {
+            throw new SecurityException("Formato de x-signature inválido");
+        }
+
+        long tsValue;
+        try {
+            tsValue = Long.parseLong(ts);
+        } catch (NumberFormatException ex) {
+            throw new SecurityException("Formato de x-signature inválido");
+        }
+
+        if (Math.abs(System.currentTimeMillis() / 1000 - tsValue) > 300) {
+            throw new SecurityException("Webhook expirado");
+        }
+
+        Object rawData = payload.get("data");
+        if (!(rawData instanceof Map<?, ?>)) {
+            throw new SecurityException("payload.data.id ausente");
+        }
+
+        Object rawId = ((Map<?, ?>) rawData).get("id");
+        if (rawId == null) {
+            throw new SecurityException("payload.data.id ausente");
+        }
+
+        String dataId = String.valueOf(rawId);
+        String stringFirmado = "id:" + dataId + ";request-id:" + (xRequestId != null ? xRequestId : "") + ";ts:" + ts + ";";
+        String computedHash = generarHmacSHA256(stringFirmado, webhookSecret);
+
+        if (!MessageDigest.isEqual(
+                computedHash.getBytes(StandardCharsets.UTF_8),
+                v1.trim().getBytes(StandardCharsets.UTF_8))) {
+            throw new SecurityException("Firma de webhook inválida");
+        }
+    }
+
     // =========================
     // PAYMENT FLOW
     // =========================
@@ -74,10 +133,16 @@ public class WebhookService {
         }
 
         Long paymentId = Long.parseLong(String.valueOf(data.get("id")));
+        String paymentIdStr = String.valueOf(paymentId);
 
         log.info("Consultando payment {}", paymentId);
 
         PaymentClient paymentClient = new PaymentClient();
+        if (ordenRepository.findByMpPaymentId(paymentIdStr).isPresent()) {
+            log.info("Webhook duplicado ignorado, paymentId: {}", paymentIdStr);
+            return;
+        }
+
         Payment payment = paymentClient.get(paymentId);
 
         actualizarOrdenDesdePayment(payment);
@@ -139,7 +204,7 @@ public class WebhookService {
                 log.info("Total Paid Amount: {}", payment.getTotalPaidAmount());
                 log.info("------------------");
 
-                // ⚠️ SOLO PROCESAR APROBADOS
+                // âš ï¸ SOLO PROCESAR APROBADOS
                 if (!"approved".equals(payment.getStatus())) {
                     continue;
                 }
@@ -196,11 +261,11 @@ public class WebhookService {
             Orden orden = ordenRepository.findById(Long.parseLong(externalReference))
                     .orElseThrow(() -> new RuntimeException("Orden no encontrada: " + externalReference));
 
-            // 🧠 Idempotencia básica
-            if (paymentId.equals(orden.getMpPaymentId()) &&
+            if (orden.getMpPaymentId() != null &&
+                    orden.getMpPaymentId().equals(paymentId) &&
                     orden.getEstado() == mapearEstado(mpStatus)) {
 
-                log.info("Orden {} ya estaba actualizada, se ignora", orden.getId());
+                log.info("Webhook duplicado ignorado, paymentId: {}", paymentId);
                 return;
             }
 
@@ -227,5 +292,25 @@ public class WebhookService {
             case "cancelled" -> EstadoOrden.CANCELADO;
             default -> EstadoOrden.PENDIENTE;
         };
+    }
+
+    private String generarHmacSHA256(String data, String secret) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            mac.init(secretKeySpec);
+
+            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+
+            for (byte b : hash) {
+                hexString.append(String.format("%02x", b & 0xff));
+            }
+
+            return hexString.toString();
+        } catch (Exception e) {
+            log.error("Error al calcular HMAC: {}", e.getMessage());
+            throw new RuntimeException("Error interno al validar firma");
+        }
     }
 }

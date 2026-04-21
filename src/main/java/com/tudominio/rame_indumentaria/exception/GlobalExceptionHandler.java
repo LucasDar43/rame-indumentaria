@@ -2,16 +2,17 @@ package com.tudominio.rame_indumentaria.exception;
 
 import com.tudominio.rame_indumentaria.exception.ApiError;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -43,10 +44,19 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<ApiError> handleSecurity(SecurityException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiError.builder()
+                        .status(401)
+                        .mensaje("Webhook no autorizado")
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
-        log.error("Error no controlado: ", ex); // ← agregá esto
+        log.error("Error no controlado: ", ex); // â† agregÃ¡ esto
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.builder()
                         .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
