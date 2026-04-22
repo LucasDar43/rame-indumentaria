@@ -34,13 +34,18 @@ public class OrdenService {
 
     private static final BigDecimal UMBRAL_ENVIO_GRATIS = BigDecimal.valueOf(50000);
     private static final BigDecimal COSTO_ENVIO_FIJO = BigDecimal.valueOf(3000);
-    private static final boolean MODO_TEST = true;
 
     private final OrdenRepository ordenRepository;
     private final ProductoRepository productoRepository;
 
     @Value("${frontend.url}")
     private String frontendUrl;
+
+    @Value("${app.base-url:http://localhost:8080}")
+    private String appBaseUrl;
+
+    @Value("${app.modo-test:false}")
+    private boolean modoTest;
 
     @Transactional
     public OrdenResponseDTO crearOrden(OrdenRequestDTO dto) throws MPException, MPApiException {
@@ -85,7 +90,7 @@ public class OrdenService {
             subtotal = subtotal.add(subtotalItem);
         }
 
-        BigDecimal envio = MODO_TEST
+        BigDecimal envio = modoTest
                 ? BigDecimal.ZERO
                 : (subtotal.compareTo(UMBRAL_ENVIO_GRATIS) < 0
                 ? COSTO_ENVIO_FIJO
@@ -151,13 +156,20 @@ public class OrdenService {
 
         log.info("🛒 Total items enviados a MP: {}", mpItems.size());
 
+        String frontendBaseUrl = frontendUrl.endsWith("/")
+                ? frontendUrl.substring(0, frontendUrl.length() - 1)
+                : frontendUrl;
+        String backendBaseUrl = appBaseUrl.endsWith("/")
+                ? appBaseUrl.substring(0, appBaseUrl.length() - 1)
+                : appBaseUrl;
+
         // =========================
         // BACK URLS
         // =========================
         PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                .success("https://paxton-successful-enlighteningly.ngrok-free.dev/success")
-                .failure("https://paxton-successful-enlighteningly.ngrok-free.dev/failure")
-                .pending("https://paxton-successful-enlighteningly.ngrok-free.dev/pending")
+                .success(frontendBaseUrl + "/checkout/exitoso")
+                .failure(frontendBaseUrl + "/checkout/fallido")
+                .pending(frontendBaseUrl + "/checkout/pendiente")
                 .build();
 
         log.info("🌐 Back URLs: {}", backUrls);
@@ -168,7 +180,7 @@ public class OrdenService {
         PreferenceRequest preferenceRequest = PreferenceRequest.builder()
                 .items(mpItems)
                 .backUrls(backUrls)
-                .notificationUrl("https://paxton-successful-enlighteningly.ngrok-free.dev/api/webhook/mercadopago")
+                .notificationUrl(backendBaseUrl + "/api/webhook/mercadopago")
                 .externalReference(String.valueOf(ordenGuardada.getId()))
                 .paymentMethods(
                         PreferencePaymentMethodsRequest.builder()
