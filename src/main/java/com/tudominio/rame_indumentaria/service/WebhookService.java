@@ -32,6 +32,9 @@ public class WebhookService {
     @Value("${mercadopago.webhook-secret}")
     private String webhookSecret;
 
+    @Value("${app.modo-test:false}")
+    private boolean modoTest;
+
     @Transactional
     public void procesarWebhook(Map<String, Object> payload) {
         String type = (String) payload.get("type");
@@ -125,6 +128,21 @@ public class WebhookService {
     // =========================
 
     private void procesarPayment(Map<String, Object> payload) throws MPException, MPApiException {
+        if (modoTest) {
+            Map<?, ?> data = (Map<?, ?>) payload.get("data");
+            if (data == null || data.get("id") == null) {
+                throw new RuntimeException("Payload inválido en modo test");
+            }
+            String paymentId = String.valueOf(data.get("id"));
+            log.info("Modo test: simulando aprobación para orden {}", paymentId);
+            Orden orden = ordenRepository.findById(Long.parseLong(paymentId))
+                    .orElseThrow(() -> new RuntimeException("Orden no encontrada en modo test: " + paymentId));
+            orden.setEstado(EstadoOrden.APROBADO);
+            orden.setMpPaymentId(paymentId);
+            ordenRepository.save(orden);
+            return;
+        }
+
         Map<?, ?> data = (Map<?, ?>) payload.get("data");
 
         if (data == null || data.get("id") == null) {

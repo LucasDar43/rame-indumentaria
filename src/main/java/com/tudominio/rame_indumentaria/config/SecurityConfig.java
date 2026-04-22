@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/ordenes/*").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/ordenes").authenticated()
                         .requestMatchers("/api/webhook/**").permitAll()
+                        .requestMatchers("/api/test/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
