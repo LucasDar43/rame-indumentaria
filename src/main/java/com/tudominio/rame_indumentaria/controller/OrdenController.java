@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/ordenes")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class OrdenController {
 
     private final OrdenService ordenService;
