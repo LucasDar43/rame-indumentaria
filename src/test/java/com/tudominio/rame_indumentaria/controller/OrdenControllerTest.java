@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -70,8 +71,8 @@ class OrdenControllerTest {
                                 .productoId(1L)
                                 .nombreProducto("Remera")
                                 .cantidad(2)
-                                .precioUnitario(12499.5)
-                                .subtotal(24999.0)
+                                .precioUnitario(BigDecimal.valueOf(12499.5))
+                                .subtotal(BigDecimal.valueOf(24999.0))
                                 .build()
                 ))
                 .fechaCreacion(LocalDateTime.now())

@@ -48,8 +48,12 @@ class OrdenIntegrationTest {
     @Autowired
     private OrdenRepository ordenRepository;
 
+    @Autowired
+    private com.tudominio.rame_indumentaria.repository.VarianteRepository varianteRepository;
+
     @BeforeEach
     void setUp() {
+        varianteRepository.deleteAll();
         ordenRepository.deleteAll();
         productoRepository.deleteAll();
     }
@@ -60,11 +64,21 @@ class OrdenIntegrationTest {
         Producto producto = productoRepository.save(Producto.builder()
                 .nombre("Remera Dry Fit")
                 .descripcion("Remera deportiva")
-                .precio(15999.0)
+                .precio(BigDecimal.valueOf(15999.0))
                 .marca("Rame")
                 .categoria("Remeras")
                 .imagenUrl("https://cdn.test/remera.jpg")
                 .build());
+
+        com.tudominio.rame_indumentaria.model.Variante variante = varianteRepository.save(
+                com.tudominio.rame_indumentaria.model.Variante.builder()
+                        .producto(producto)
+                        .talle("M")
+                        .color("Negro")
+                        .stock(10)
+                        .activo(true)
+                        .build()
+        );
 
         Preference preference = mock(Preference.class);
         when(preference.getId()).thenReturn("pref-integration");
@@ -78,6 +92,7 @@ class OrdenIntegrationTest {
                 "items", new Object[]{
                         Map.of(
                                 "productoId", producto.getId(),
+                                "varianteId", variante.getId(),
                                 "cantidad", 2
                         )
                 }
@@ -111,6 +126,6 @@ class OrdenIntegrationTest {
         assertThat(orden.getItems()).hasSize(1);
         assertThat(orden.getItems().get(0).getProductoId()).isEqualTo(producto.getId());
         assertThat(orden.getItems().get(0).getCantidad()).isEqualTo(2);
-        assertThat(orden.getTotal()).isEqualByComparingTo(BigDecimal.valueOf(31998.0));
+        assertThat(orden.getTotal()).isEqualByComparingTo(BigDecimal.valueOf(34998.0));
     }
 }
