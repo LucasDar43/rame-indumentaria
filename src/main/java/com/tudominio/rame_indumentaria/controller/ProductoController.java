@@ -1,7 +1,9 @@
 package com.tudominio.rame_indumentaria.controller;
 
+import com.tudominio.rame_indumentaria.dto.FiltrosDisponiblesDTO;
 import com.tudominio.rame_indumentaria.dto.ImportacionResultadoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoDTO;
+import com.tudominio.rame_indumentaria.dto.ProductoFiltrosDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoRequestDTO;
 import com.tudominio.rame_indumentaria.service.CloudinaryService;
 import com.tudominio.rame_indumentaria.service.ImportacionService;
@@ -33,6 +35,33 @@ public class ProductoController {
     @GetMapping
     public ResponseEntity<Page<ProductoDTO>> listar(Pageable pageable) {
         return ResponseEntity.ok(productoService.listarPaginado(pageable));
+    }
+
+    @GetMapping("/buscar-filtrado")
+    public ResponseEntity<Page<ProductoDTO>> listarConFiltros(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String categoria,
+            @RequestParam(required = false) String marca,
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) String talle,
+            @RequestParam(required = false) String ordenar,
+            Pageable pageable) {
+
+        ProductoFiltrosDTO filtros = ProductoFiltrosDTO.builder()
+                .q(q)
+                .categoria(categoria)
+                .marca(marca)
+                .color(color)
+                .talle(talle)
+                .ordenar(ordenar)
+                .build();
+
+        return ResponseEntity.ok(productoService.listarConFiltros(filtros, pageable));
+    }
+
+    @GetMapping("/filtros-disponibles")
+    public ResponseEntity<FiltrosDisponiblesDTO> getFiltrosDisponibles() {
+        return ResponseEntity.ok(productoService.getFiltrosDisponibles());
     }
 
     @PostMapping(value = "/importar-simple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -42,6 +42,10 @@ public class Producto {
     @Builder.Default
     private List<ImagenProducto> imagenes = new ArrayList<>();
 
+    @OneToMany(mappedBy = "producto", fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Variante> variantes = new ArrayList<>();
+
     @Builder.Default
     private Boolean activo = true;
 
