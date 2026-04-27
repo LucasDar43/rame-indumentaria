@@ -93,7 +93,7 @@ public class OrdenService {
             variante.setStock(variante.getStock() - itemDto.getCantidad());
             varianteRepository.save(variante);
 
-            BigDecimal precioUnitario = BigDecimal.valueOf(producto.getPrecio());
+            BigDecimal precioUnitario = producto.getPrecio();
             BigDecimal subtotalItem = precioUnitario.multiply(BigDecimal.valueOf(itemDto.getCantidad()));
 
             log.info("🧾 Item DTO → id: {} nombre: {} precio: {} cantidad: {}",
@@ -111,7 +111,7 @@ public class OrdenService {
                     .color(variante.getColor())
                     .imagenUrl(producto.getImagenUrl())
                     .cantidad(itemDto.getCantidad())
-                    .precioUnitario(precioUnitario.doubleValue())
+                    .precioUnitario(precioUnitario)
                     .build();
 
             items.add(item);
@@ -164,7 +164,7 @@ public class OrdenService {
                     .title(item.getNombreProducto() != null ? item.getNombreProducto() : "Producto")
                     .pictureUrl("https://via.placeholder.com/150")
                     .quantity(item.getCantidad())
-                    .unitPrice(BigDecimal.valueOf(item.getPrecioUnitario()))
+                    .unitPrice(item.getPrecioUnitario())
                     .currencyId("ARS")
                     .build();
 
@@ -284,7 +284,8 @@ public class OrdenService {
                         .imagenUrl(item.getImagenUrl())
                         .cantidad(item.getCantidad())
                         .precioUnitario(item.getPrecioUnitario())
-                        .subtotal(item.getPrecioUnitario() * item.getCantidad())
+                        .subtotal(item.getPrecioUnitario()
+                                .multiply(BigDecimal.valueOf(item.getCantidad())))
                         .build()
         ).collect(Collectors.toList());
 

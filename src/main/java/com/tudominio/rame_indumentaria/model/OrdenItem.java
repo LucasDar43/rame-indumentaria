@@ -3,6 +3,8 @@ package com.tudominio.rame_indumentaria.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "orden_items")
 @Data
@@ -26,5 +28,5 @@ public class OrdenItem {
     private String color;
     private String imagenUrl;
     private Integer cantidad;
-    private Double precioUnitario;
+    private BigDecimal precioUnitario;
 }

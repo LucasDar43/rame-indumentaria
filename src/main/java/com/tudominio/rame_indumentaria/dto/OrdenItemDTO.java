@@ -2,6 +2,8 @@ package com.tudominio.rame_indumentaria.dto;
 
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -14,6 +16,6 @@ public class OrdenItemDTO {
     private String color;
     private String imagenUrl;
     private Integer cantidad;
-    private Double precioUnitario;
-    private Double subtotal;
+    private BigDecimal precioUnitario;
+    private BigDecimal subtotal;
 }

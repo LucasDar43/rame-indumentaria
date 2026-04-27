@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -154,7 +155,7 @@ public class ImportacionService {
             throw new IllegalArgumentException("El color es obligatorio");
         }
 
-        Double precio = parsearPrecio(precioRaw);
+        BigDecimal precio = parsearPrecio(precioRaw);
         Integer stock = parsearStock(stockRaw);
 
         return new FilaImportacionData(
@@ -171,19 +172,19 @@ public class ImportacionService {
         );
     }
 
-    private Double parsearPrecio(String precioRaw) {
+    private BigDecimal parsearPrecio(String precioRaw) {
         if (precioRaw == null || precioRaw.isBlank()) {
             throw new IllegalArgumentException("El precio es obligatorio");
         }
 
-        double precio;
+        BigDecimal precio;
         try {
-            precio = Double.parseDouble(precioRaw);
+            precio = new BigDecimal(precioRaw);
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("El precio no es un numero valido: " + precioRaw);
         }
 
-        if (precio <= 0) {
+        if (precio.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("El precio debe ser mayor a 0");
         }
 
@@ -220,7 +221,7 @@ public class ImportacionService {
     private record FilaImportacionData(
             String nombre,
             String descripcion,
-            Double precio,
+            BigDecimal precio,
             String marca,
             String categoria,
             String subcategoria,

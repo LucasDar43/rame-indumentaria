@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -96,10 +97,10 @@ public class ImportacionSimpleService {
                     continue;
                 }
 
-                Double precio;
+                BigDecimal precio;
                 try {
                     String precioNormalizado = normalizarPrecio(precioRaw);
-                    precio = Double.parseDouble(precioNormalizado);
+                    precio = new BigDecimal(precioNormalizado);
                 } catch (Exception e) {
                     errores.add(FilaErrorDTO.builder()
                             .fila(i + 1)
@@ -108,7 +109,7 @@ public class ImportacionSimpleService {
                     continue;
                 }
 
-                if (precio <= 0) {
+                if (precio.compareTo(BigDecimal.ZERO) <= 0) {
                     errores.add(FilaErrorDTO.builder()
                             .fila(i + 1)
                             .mensaje("El precio debe ser mayor a 0")
