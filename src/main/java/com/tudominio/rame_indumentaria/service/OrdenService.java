@@ -11,8 +11,10 @@ import com.tudominio.rame_indumentaria.dto.OrdenResponseDTO;
 import com.tudominio.rame_indumentaria.model.Orden;
 import com.tudominio.rame_indumentaria.model.OrdenItem;
 import com.tudominio.rame_indumentaria.model.Producto;
+import com.tudominio.rame_indumentaria.model.Variante;
 import com.tudominio.rame_indumentaria.repository.OrdenRepository;
 import com.tudominio.rame_indumentaria.repository.ProductoRepository;
+import com.tudominio.rame_indumentaria.repository.VarianteRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class OrdenService {
 
     private final OrdenRepository ordenRepository;
     private final ProductoRepository productoRepository;
+    private final VarianteRepository varianteRepository;
 
     @Value("${frontend.url}")
     private String frontendUrl;
@@ -68,6 +71,28 @@ public class OrdenService {
                     .orElseThrow(() -> new EntityNotFoundException(
                             "Producto no encontrado: " + itemDto.getProductoId()));
 
+            Long varianteId = itemDto.getVarianteId();
+            Variante variante = varianteRepository.findById(varianteId)
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Variante no encontrada: " + varianteId));
+
+            if (!Boolean.TRUE.equals(variante.getActivo())) {
+                throw new IllegalArgumentException("Variante no disponible: " + varianteId);
+            }
+
+            if (!variante.getProducto().getId().equals(itemDto.getProductoId())) {
+                throw new IllegalArgumentException("Variante no pertenece al producto indicado");
+            }
+
+            if (variante.getStock() < itemDto.getCantidad()) {
+                throw new IllegalArgumentException("Stock insuficiente para: " + producto.getNombre()
+                        + " - Talle: " + variante.getTalle()
+                        + " - Color: " + variante.getColor());
+            }
+
+            variante.setStock(variante.getStock() - itemDto.getCantidad());
+            varianteRepository.save(variante);
+
             BigDecimal precioUnitario = BigDecimal.valueOf(producto.getPrecio());
             BigDecimal subtotalItem = precioUnitario.multiply(BigDecimal.valueOf(itemDto.getCantidad()));
 
@@ -80,7 +105,10 @@ public class OrdenService {
 
             OrdenItem item = OrdenItem.builder()
                     .productoId(producto.getId())
+                    .varianteId(variante.getId())
                     .nombreProducto(producto.getNombre())
+                    .talle(variante.getTalle())
+                    .color(variante.getColor())
                     .imagenUrl(producto.getImagenUrl())
                     .cantidad(itemDto.getCantidad())
                     .precioUnitario(precioUnitario.doubleValue())
@@ -249,7 +277,10 @@ public class OrdenService {
         List<OrdenItemDTO> itemDTOs = orden.getItems().stream().map(item ->
                 OrdenItemDTO.builder()
                         .productoId(item.getProductoId())
+                        .varianteId(item.getVarianteId())
                         .nombreProducto(item.getNombreProducto())
+                        .talle(item.getTalle())
+                        .color(item.getColor())
                         .imagenUrl(item.getImagenUrl())
                         .cantidad(item.getCantidad())
                         .precioUnitario(item.getPrecioUnitario())

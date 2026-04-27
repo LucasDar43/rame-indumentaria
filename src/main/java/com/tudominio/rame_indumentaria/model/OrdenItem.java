@@ -20,7 +20,10 @@ public class OrdenItem {
     private Orden orden;
 
     private Long productoId;
+    private Long varianteId;
     private String nombreProducto;
+    private String talle;
+    private String color;
     private String imagenUrl;
     private Integer cantidad;
     private Double precioUnitario;

@@ -14,6 +14,9 @@ public class OrdenItemRequestDTO {
     private Long productoId;
 
     @NotNull
+    private Long varianteId;
+
+    @NotNull
     @Min(1)
     private Integer cantidad;
 }
