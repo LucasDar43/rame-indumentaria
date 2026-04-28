@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -164,10 +165,16 @@ class WebhookServiceProcesarWebhookTest {
     }
 
     private Payment paymentMock(Long paymentId, String status, String externalReference) {
+        return paymentMock(paymentId, status, externalReference, null);
+    }
+
+    private Payment paymentMock(Long paymentId, String status, String externalReference,
+                                java.math.BigDecimal transactionAmount) {
         Payment payment = mock(Payment.class);
         when(payment.getId()).thenReturn(paymentId);
         when(payment.getStatus()).thenReturn(status);
         when(payment.getExternalReference()).thenReturn(externalReference);
+        lenient().when(payment.getTransactionAmount()).thenReturn(transactionAmount);
         return payment;
     }
 

@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Map;
@@ -266,6 +267,29 @@ public class WebhookService {
 
         Orden orden = ordenRepository.findById(Long.parseLong(externalReference))
                 .orElseThrow(() -> new RuntimeException("Orden no encontrada: " + externalReference));
+
+        if ("approved".equals(mpStatus) && orden.getTotal() != null) {
+            BigDecimal montoPagado = payment.getTransactionAmount();
+
+            if (montoPagado == null) {
+                throw new RuntimeException(
+                        "Payment " + paymentId + " no tiene transactionAmount"
+                );
+            }
+
+            // Tolerancia de $1 ARS para diferencias de redondeo
+            BigDecimal diferencia = orden.getTotal()
+                    .subtract(montoPagado)
+                    .abs();
+
+            if (diferencia.compareTo(BigDecimal.ONE) > 0) {
+                throw new RuntimeException(
+                        "Monto pagado " + montoPagado +
+                                " no coincide con total de orden " + orden.getTotal() +
+                                " para orden " + orden.getId()
+                );
+            }
+        }
 
         if (orden.getMpPaymentId() != null &&
                 orden.getMpPaymentId().equals(paymentId) &&

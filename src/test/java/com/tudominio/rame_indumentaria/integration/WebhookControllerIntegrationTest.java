@@ -216,6 +216,7 @@ class WebhookControllerIntegrationTest {
         when(payment.getId()).thenReturn(paymentId);
         when(payment.getStatus()).thenReturn(status);
         when(payment.getExternalReference()).thenReturn(externalReference);
+        when(payment.getTransactionAmount()).thenReturn(null);
         return payment;
     }
 }
