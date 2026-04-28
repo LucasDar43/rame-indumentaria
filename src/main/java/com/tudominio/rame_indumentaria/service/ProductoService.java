@@ -1,5 +1,6 @@
 package com.tudominio.rame_indumentaria.service;
 
+import com.tudominio.rame_indumentaria.dto.CategoriasCountDTO;
 import com.tudominio.rame_indumentaria.dto.FiltrosDisponiblesDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoFiltrosDTO;
@@ -19,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Map;
 import com.tudominio.rame_indumentaria.model.ImagenProducto;
 import com.tudominio.rame_indumentaria.repository.ImagenProductoRepository;
 
@@ -57,6 +59,21 @@ public class ProductoService {
         return productoMapper.toDTOList(
                 productoRepository.findByCategoriaAndActivoTrue(categoria)
         );
+    }
+
+    public CategoriasCountDTO getConteosPorCategoria() {
+        List<Object[]> resultados = productoRepository.contarPorCategoria();
+        Map<String, Long> conteos = new java.util.LinkedHashMap<>();
+        for (Object[] fila : resultados) {
+            String categoria = (String) fila[0];
+            Long count = (Long) fila[1];
+            if (categoria != null) {
+                conteos.put(categoria, count);
+            }
+        }
+        return CategoriasCountDTO.builder()
+                .conteos(conteos)
+                .build();
     }
 
     public ProductoDTO guardar(ProductoRequestDTO dto) {

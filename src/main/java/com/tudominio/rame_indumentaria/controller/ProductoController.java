@@ -1,5 +1,6 @@
 package com.tudominio.rame_indumentaria.controller;
 
+import com.tudominio.rame_indumentaria.dto.CategoriasCountDTO;
 import com.tudominio.rame_indumentaria.dto.FiltrosDisponiblesDTO;
 import com.tudominio.rame_indumentaria.dto.ImportacionResultadoDTO;
 import com.tudominio.rame_indumentaria.dto.ProductoDTO;
@@ -61,6 +62,11 @@ public class ProductoController {
     @GetMapping("/filtros-disponibles")
     public ResponseEntity<FiltrosDisponiblesDTO> getFiltrosDisponibles() {
         return ResponseEntity.ok(productoService.getFiltrosDisponibles());
+    }
+
+    @GetMapping("/conteos-categorias")
+    public ResponseEntity<CategoriasCountDTO> conteosPorCategoria() {
+        return ResponseEntity.ok(productoService.getConteosPorCategoria());
     }
 
     @PostMapping(value = "/importar-simple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

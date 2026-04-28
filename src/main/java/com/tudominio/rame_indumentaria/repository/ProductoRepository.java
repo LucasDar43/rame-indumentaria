@@ -24,6 +24,11 @@ public interface ProductoRepository extends
 
     Page<Producto> findByActivoTrue(Pageable pageable);
 
+    @Query("SELECT p.categoria, COUNT(p) FROM Producto p " +
+            "WHERE p.activo = true " +
+            "GROUP BY p.categoria")
+    List<Object[]> contarPorCategoria();
+
     @Query("SELECT p FROM Producto p WHERE " +
             "LOWER(p.nombre) LIKE LOWER(CONCAT('%', :busqueda, '%')) OR " +
             "LOWER(p.marca) LIKE LOWER(CONCAT('%', :busqueda, '%'))")
