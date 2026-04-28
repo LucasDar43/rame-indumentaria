@@ -40,14 +40,52 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // Auth publica
                         .requestMatchers("/api/auth/**").permitAll()
+
+                        // Productos - lectura publica
                         .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/productos/*/variantes").permitAll()
+
+                        // Variantes - lectura publica
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/productos/*/variantes").permitAll()
+
+                        // Ordenes - creacion publica
                         .requestMatchers(HttpMethod.POST, "/api/ordenes").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/ordenes/*").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/ordenes").authenticated()
+
+                        // Ordenes - estado publico (solo estado, sin datos personales)
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/ordenes/*/estado").permitAll()
+
+                        // Webhook - publico para MercadoPago
                         .requestMatchers("/api/webhook/**").permitAll()
+
+                        // Test - solo en modo test
                         .requestMatchers("/api/test/**").permitAll()
+
+                        // Productos - escritura solo ADMIN
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/productos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/productos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/productos/**").hasRole("ADMIN")
+
+                        // Variantes - escritura solo ADMIN
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/productos/*/variantes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/productos/*/variantes/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/productos/*/variantes/**").hasRole("ADMIN")
+
+                        // Ordenes - listado y detalle completo solo ADMIN
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/ordenes").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/ordenes/*").hasRole("ADMIN")
+
+                        // Todo lo demas requiere autenticacion
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

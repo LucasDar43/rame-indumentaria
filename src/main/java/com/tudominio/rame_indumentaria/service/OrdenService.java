@@ -6,6 +6,7 @@ import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.preference.Preference;
 import com.tudominio.rame_indumentaria.dto.OrdenItemDTO;
 import com.tudominio.rame_indumentaria.dto.OrdenItemRequestDTO;
+import com.tudominio.rame_indumentaria.dto.OrdenPublicaDTO;
 import com.tudominio.rame_indumentaria.dto.OrdenRequestDTO;
 import com.tudominio.rame_indumentaria.dto.OrdenResponseDTO;
 import com.tudominio.rame_indumentaria.model.Orden;
@@ -271,6 +272,16 @@ public class OrdenService {
     public Page<OrdenResponseDTO> listarPaginado(Pageable pageable) {
         return ordenRepository.findAllByOrderByFechaCreacionDesc(pageable)
                 .map(orden -> toResponseDTO(orden, null));
+    }
+
+    public OrdenPublicaDTO buscarPublicoPorId(Long id) {
+        Orden orden = ordenRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Orden no encontrada: " + id));
+        return OrdenPublicaDTO.builder()
+                .id(orden.getId())
+                .estado(orden.getEstado())
+                .mpPreferenceId(orden.getMpPreferenceId())
+                .build();
     }
 
     private OrdenResponseDTO toResponseDTO(Orden orden, String initPoint) {

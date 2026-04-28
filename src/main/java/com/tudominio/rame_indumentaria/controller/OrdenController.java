@@ -2,6 +2,7 @@ package com.tudominio.rame_indumentaria.controller;
 
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import com.tudominio.rame_indumentaria.dto.OrdenPublicaDTO;
 import com.tudominio.rame_indumentaria.dto.OrdenRequestDTO;
 import com.tudominio.rame_indumentaria.dto.OrdenResponseDTO;
 import com.tudominio.rame_indumentaria.service.OrdenService;
@@ -31,6 +32,11 @@ public class OrdenController {
     @GetMapping("/{id}")
     public ResponseEntity<OrdenResponseDTO> buscarPorId(@PathVariable Long id) {
         return ResponseEntity.ok(ordenService.buscarPorId(id));
+    }
+
+    @GetMapping("/{id}/estado")
+    public ResponseEntity<OrdenPublicaDTO> estadoPublico(@PathVariable Long id) {
+        return ResponseEntity.ok(ordenService.buscarPublicoPorId(id));
     }
 
     @GetMapping

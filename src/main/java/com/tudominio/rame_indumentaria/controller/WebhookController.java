@@ -24,9 +24,6 @@ public class WebhookController {
             @RequestHeader(value = "x-request-id", required = false) String xRequestId,
             @RequestBody Map<String, Object> payload) {
 
-        System.out.println("ðŸ”¥ WEBHOOK RECIBIDO:");
-        System.out.println(payload);
-
         if (!modoTest) {
             webhookService.validarFirma(xSignature, xRequestId, payload);
         }
