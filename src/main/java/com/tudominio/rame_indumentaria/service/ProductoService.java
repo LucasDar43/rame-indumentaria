@@ -94,6 +94,14 @@ public class ProductoService {
         return productoMapper.toDTO(productoRepository.save(producto));
     }
 
+    public ProductoDTO actualizarImagen(Long id, String imagenUrl) {
+        Producto producto = productoRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Producto no encontrado con id: " + id));
+        producto.setImagenUrl(imagenUrl);
+        return productoMapper.toDTO(productoRepository.save(producto));
+    }
+
     public ProductoDTO crear(ProductoRequestDTO request, String imagenUrl) {
         Producto producto = productoMapper.toEntity(request);
         producto.setImagenUrl(imagenUrl);

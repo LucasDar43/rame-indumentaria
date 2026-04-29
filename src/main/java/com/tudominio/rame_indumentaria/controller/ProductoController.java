@@ -115,6 +115,19 @@ public class ProductoController {
         return ResponseEntity.ok(productoService.actualizar(id, dto));
     }
 
+    @PutMapping(value = "/{id}/imagen",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ProductoDTO> actualizarImagen(
+            @PathVariable Long id,
+            @RequestPart("imagen") MultipartFile imagen
+    ) throws IOException {
+        if (imagen == null || imagen.isEmpty()) {
+            throw new IllegalArgumentException("La imagen es obligatoria");
+        }
+        String imagenUrl = cloudinaryService.subirImagen(imagen);
+        return ResponseEntity.ok(productoService.actualizarImagen(id, imagenUrl));
+    }
+
     // DELETE soft delete
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminar(@PathVariable Long id) {
